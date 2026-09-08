@@ -1,201 +1,156 @@
-# 学生管理系统（终端版）
-# 功能：
-#   1. 添加学生
-#   2. 删除学生
-#   3. 查看所有学生
-#   4. 管理员功能（录入成绩 / 修改成绩）
-#   0. 退出
-# 说明：成绩默认是 None，代表还没有录入。
-#       只有输入正确管理员密码后，才能录入 / 修改成绩。
-
-# 管理员密码（可以自行修改）
-ADMIN_PASSWORD = "123456"
-
-# 用列表保存所有学生，每个学生是一个字典，字段固定：id / name / score
-students = []
-
-# 用来生成递增的学号
-next_id = 1
+from datetime import datetime
 
 
-def make_id():
-    """生成一个新的学号（递增）。"""
-    global next_id
-    new_id = next_id
-    next_id += 1
-    return new_id
+class Person:
+    def __init__(self, name, age, gender):
+        self.name = name
+        self.age = age
+        self.gender = gender
 
 
-def add_student():
-    """添加一个学生：只需要学号、姓名，成绩默认为空。"""
-    global students
-    name = input("请输入学生姓名：").strip()
-    if name == "":
-        print("❌ 姓名不能为空！")
-        return
+class Student(Person):
+    count = 1  # 类属性：用来生成递增且唯一的学号
 
-    student = {
-        "id": make_id(),
-        "name": name,
-        "score": None,   # 成绩还没录入
-    }
-    students.append(student)
-    print(f"✅ 添加成功！学号为 {student['id']} 的学生【{name}】已加入系统。")
+    def __init__(self, name, age, gender):
+        super().__init__(name, age, gender)
+        # 学号 = 入学年份 + 序号，每新增一个学生 count 就 +1，保证不重复
+        self.id = f'{datetime.now().year}{Student.count:03d}'
+        Student.count += 1
+        self.scores = {}
 
+    # 录入 / 修改成绩（key 相同时直接覆盖旧成绩，达到"修改"效果）
+    def set_score(self, subject, score):
+        self.scores[subject] = score
 
-def delete_student():
-    """按学号删除一个学生。"""
-    global students
-    sid = _input_id("请输入要删除的学号：")
-    if sid is None:
-        return
+    # 删除某科成绩
+    def del_score(self, subject):
+        self.scores.pop(subject, None)
 
-    for i, stu in enumerate(students):
-        if stu["id"] == sid:
-            students.pop(i)
-            print(f"✅ 已删除学号为 {sid} 的学生【{stu['name']}】。")
-            return
+    # 返回平均成绩（没成绩返回 0）
+    def get_average_score(self):
+        if self.scores:
+            return sum(self.scores.values()) / len(self.scores)
+        return 0
 
-    print(f"❌ 找不到学号为 {sid} 的学生。")
+    # 重写 __str__ 魔法方法
+    def __str__(self):
+        return (f'[{self.id}] {self.name} | {self.age}岁 | {self.gender}'
+                f' | 成绩:{self.scores} | 平均:{self.get_average_score():.1f}')
 
 
-def show_all():
-    """查看所有学生及其成绩。"""
-    if not students:
-        print("📭 系统里还没有任何学生，请先添加。")
-        return
+# 管理 Student 实例
+class Manager:
+    def __init__(self):
+        self.students = []
 
-    print("\n" + "=" * 46)
-    print("学号".ljust(6) + "姓名".ljust(10) + "成绩")
-    print("-" * 46)
-    for stu in students:
-        # 成绩为空显示"未录入"，否则显示分数
-        score = "未录入" if stu["score"] is None else f"{stu['score']}"
-        print(str(stu["id"]).ljust(8) + stu["name"].ljust(10) + score)
-    print("=" * 46)
-    print(f"当前共有 {len(students)} 名学生。\n")
-
-
-# ---------- 管理员相关 ----------
-
-def is_admin():
-    """校验管理员密码。"""
-    password = input("请输入管理员密码：")
-    if password == ADMIN_PASSWORD:
-        print("✅ 密码正确，进入管理员模式。")
-        return True
-    print("❌ 密码错误，无法进入管理员功能。")
-    return False
-
-
-def input_score(sid):
-    """录入/修改某个学生的成绩。返回 True 表示操作成功。"""
-    for stu in students:
-        if stu["id"] == sid:
-            try:
-                score = float(input(f"请输入学号 {sid}（{stu['name']}）的成绩："))
-            except ValueError:
-                print("❌ 成绩必须是数字！")
-                return False
-            if score < 0 or score > 100:
-                print("❌ 成绩必须在 0~100 之间！")
-                return False
-            stu["score"] = score
-            print(f"✅ 已录入/修改：{stu['name']} 的成绩为 {score} 分。")
-            return True
-
-    print(f"❌ 找不到学号为 {sid} 的学生。")
-    return False
-
-
-def record_score():
-    """录入成绩。"""
-    show_all()
-    if not students:
-        return
-    sid = _input_id("请输入要录入成绩的学号：")
-    if sid is not None:
-        input_score(sid)
-
-
-def modify_score():
-    """修改成绩。"""
-    if not students:
-        print("📭 系统里还没有任何学生，请先添加。")
-        return
-    show_all()
-    sid = _input_id("请输入要修改成绩的学号：")
-    if sid is not None:
-        input_score(sid)
-
-
-def admin_menu():
-    """管理员菜单：录入成绩 / 修改成绩 / 退出。"""
-    if not is_admin():
-        return
-
-    while True:
-        print("\n------ 管理员模式 ------")
-        print("1. 录入成绩")
-        print("2. 修改成绩")
-        print("0. 退出管理员模式")
-        choice = input("请选择：").strip()
-
-        if choice == "1":
-            record_score()
-        elif choice == "2":
-            modify_score()
-        elif choice == "0":
-            print("✅ 已退出管理员模式。")
-            break
-        else:
-            print("❌ 无效选项，请重新输入。")
-
-
-# ---------- 通用工具 ----------
-
-def _input_id(tip):
-    """输入学号，非法输入返回 None。"""
-    try:
-        return int(input(tip))
-    except ValueError:
-        print("❌ 学号必须是数字！")
+    # 根据学号查找学生，找不到返回 None
+    def find_student(self, sid):
+        for student in self.students:
+            if sid == student.id:
+                return student
         return None
 
+    # 添加学生
+    def add_student(self, student):
+        self.students.append(student)
 
-# ---------- 主菜单 ----------
+    # 按学号删除学生，成功返回 True
+    def del_student(self, sid):
+        student = self.find_student(sid)
+        if student:
+            self.students.remove(student)
+            return True
+        return False
 
-def main_menu():
-    print("\n======== 学生管理系统 ========")
-    print("1. 添加学生")
-    print("2. 删除学生")
-    print("3. 查看所有学生")
-    print("4. 管理员功能（录入/修改成绩）")
-    print("0. 退出系统")
-    print("=" * 30)
+    # 展示所有学生
+    def show_all_students(self):
+        if not self.students:
+            print('系统内暂无学生')
+            return
+        for student in self.students:
+            print(student)
+
+    # 主菜单
+    def run(self):
+        while True:
+            print('\n--------学生管理系统--------')
+            print('1.添加学生')
+            print('2.删除学生')
+            print('3.查看所有学生')
+            print('4.录入/修改成绩')
+            print('5.退出')
+
+            choice = self._input_int('请输入序列号：', '请输入菜单序号')
+
+            if choice == 1:
+                name = input('请输入学生姓名：').strip()
+                if not name:
+                    print('❌ 姓名不能为空')
+                    continue
+                age = self._input_int('请输入学生年龄：', '请输入数字年龄')
+                gender = input('请输入学生性别：').strip()
+                student = Student(name, age, gender)
+                self.add_student(student)
+                print(f'✅ 添加成功，学号：{student.id}')
+            elif choice == 2:
+                if not self.students:
+                    print('系统内暂无学生')
+                    continue
+                sid = input('请输入要删除的学生学号：').strip()
+                if self.del_student(sid):
+                    print(f'✅ 已删除学号 {sid} 的学生')
+                else:
+                    print(f'❌ 学号 {sid} 不存在')
+            elif choice == 3:
+                self.show_all_students()
+            elif choice == 4:
+                self._set_score_flow()
+            elif choice == 5:
+                print('👋 感谢使用，再见')
+                break
+            else:
+                print('❌ 序列号非法，请重新输入')
+
+    # 录入/修改成绩流程：按学号定位 -> 录入科目与分数
+    def _set_score_flow(self):
+        if not self.students:
+            print('系统内暂无学生，请先添加')
+            return
+        self.show_all_students()
+        sid = input('请输入要录入成绩的学生学号：').strip()
+        student = self.find_student(sid)
+        if not student:
+            print(f'❌ 学号 {sid} 不存在')
+            return
+
+        # 展示该生现有成绩，方便判断是新增还是修改
+        print(f'{student.name} 当前成绩：{student.scores if student.scores else "（暂无）"}')
+        subject = input('请输入学科：').strip()
+        if not subject:
+            print('❌ 学科不能为空')
+            return
+        score = self._input_score()
+        student.set_score(subject, score)
+        print(f'✅ 已为 {student.name} 录入 {subject}：{score} 分')
+
+    # 读取 0~100 的成绩
+    def _input_score(self):
+        while True:
+            value = self._input_int('请输入成绩（0~100）：', '请输入数字成绩')
+            if 0 <= value <= 100:
+                return value
+            print('❌ 成绩必须在 0~100 之间')
+
+    # 读取整数的通用函数，输入非法时不会崩溃，而是要求重新输入
+    @staticmethod
+    def _input_int(prompt, err_tip):
+        while True:
+            raw = input(prompt).strip()
+            try:
+                return int(raw)
+            except ValueError:
+                print(f'❌ {err_tip}，请重新输入')
 
 
-def main():
-    print("🎓 欢迎使用学生管理系统（终端版）！")
-    while True:
-        main_menu()
-        choice = input("请选择功能：").strip()
-
-        if choice == "1":
-            add_student()
-        elif choice == "2":
-            delete_student()
-        elif choice == "3":
-            show_all()
-        elif choice == "4":
-            admin_menu()
-        elif choice == "0":
-            print("👋 感谢使用，再见！")
-            break
-        else:
-            print("❌ 无效选项，请重新输入。")
-
-
-# 程序入口
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    Manager().run()
